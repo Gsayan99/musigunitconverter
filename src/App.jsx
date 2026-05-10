@@ -432,6 +432,18 @@ const App = () => {
     return { energy: dispE, fluence: dispF, hasEnergy: true, hasFluence: d > 0 };
   };
 
+  const cycleFluenceRes = (type) => {
+    const eUnits = ['J', 'mJ', 'µJ', 'nJ', 'pJ'];
+    const fUnits = ['J/cm²', 'mJ/cm²', 'µJ/cm²', 'nJ/cm²'];
+    if (type === 'energy') {
+      const idx = eUnits.indexOf(fluenceResUnits.energy);
+      setFluenceResUnits(p => ({ ...p, energy: eUnits[(idx + 1) % eUnits.length] }));
+    } else {
+      const idx = fUnits.indexOf(fluenceResUnits.fluence);
+      setFluenceResUnits(p => ({ ...p, fluence: fUnits[(idx + 1) % fUnits.length] }));
+    }
+  };
+
   // Generalized Grid and Tick drawing
   const drawGridAndTicks = (ctx, w, h, xMin, xMax, yMin, yMax, xLabel) => {
     ctx.clearRect(0, 0, w, h);
@@ -985,6 +997,59 @@ const App = () => {
     }
   }, [mode]);
 
+  const handleAcSetupChange = (field, value) => {
+    setAcSetup(prev => {
+      const next = { ...prev, [field]: value };
+      const lam0 = parseFloat(next.centerLam);
+      if (!lam0 || lam0 <= 0) return next;
+
+      if (field === 'spectralWidth' || field === 'centerLam') {
+        const dLam = parseFloat(next.spectralWidth);
+        if (dLam > 0) {
+          const f1 = C_NM_FS / (lam0 - dLam / 2);
+          const f2 = C_NM_FS / (lam0 + dLam / 2);
+          next.tlPulseWidth = formatVal(0.441 / Math.abs(f1 - f2));
+        } else {
+          next.tlPulseWidth = '';
+        }
+      } else if (field === 'tlPulseWidth') {
+        const tl = parseFloat(value);
+        if (tl > 0) {
+          const f0 = C_NM_FS / lam0;
+          const df = 0.441 / tl;
+          next.spectralWidth = formatVal(Math.abs((C_NM_FS / (f0 + df / 2)) - (C_NM_FS / (f0 - df / 2))));
+        } else {
+          next.spectralWidth = '';
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleDispSetupChange = (field, value) => {
+    setDispSetup(prev => {
+      const next = { ...prev, [field]: value };
+      const lam0 = parseFloat(next.centerLam);
+      if (!lam0 || lam0 <= 0) return next;
+      if (field === 'spectralWidth' || field === 'centerLam') {
+        const dLam = parseFloat(next.spectralWidth);
+        if (dLam > 0) {
+          const f1 = C_NM_FS / (lam0 - dLam / 2);
+          const f2 = C_NM_FS / (lam0 + dLam / 2);
+          next.tlPulseWidth = formatVal(0.441 / Math.abs(f1 - f2));
+        } else next.tlPulseWidth = '';
+      } else if (field === 'tlPulseWidth') {
+        const tl = parseFloat(value);
+        if (tl > 0) {
+          const f0 = C_NM_FS / lam0;
+          const df = 0.441 / tl;
+          next.spectralWidth = formatVal(Math.abs((C_NM_FS / (f0 + df / 2)) - (C_NM_FS / (f0 - df / 2))));
+        } else next.spectralWidth = '';
+      }
+      return next;
+    });
+  };
+
   const dispResults = useMemo(() => calculateTotalDispersion(), [dispSetup]);
   const bwResults = calculateBandwidth();
   const fluenceResults = calculateFluence();
@@ -1070,15 +1135,15 @@ const App = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Central Wavelength</span>
-              <InputCard label="" symbol="λ₀" unit="nm" value={dispSetup.centerLam} onChange={(v) => handleDispSetup('centerLam', v)} step={10} icon={<Waves className="w-4 h-4 text-red-500" />} placeholder="e.g. 800" />
+              <InputCard label="" symbol="λ₀" unit="nm" value={dispSetup.centerLam} onChange={(v) => handleDispSetupChange('centerLam', v)} step={10} icon={<Waves className="w-4 h-4 text-red-500" />} placeholder="e.g. 800" />
             </div>
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Spectral FWHM</span>
-              <InputCard label="" symbol="Δλ" unit="nm" value={dispSetup.spectralWidth} onChange={(v) => handleDispSetup('spectralWidth', v)} step={5} icon={<ArrowRightLeft className="w-4 h-4 text-red-500" />} placeholder="e.g. 20" />
+              <InputCard label="" symbol="Δλ" unit="nm" value={dispSetup.spectralWidth} onChange={(v) => handleDispSetupChange('spectralWidth', v)} step={5} icon={<ArrowRightLeft className="w-4 h-4 text-red-500" />} placeholder="e.g. 20" />
             </div>
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">TL Pulse Width</span>
-              <InputCard label="" symbol="τ₀" unit="fs" value={dispSetup.tlPulseWidth} onChange={(v) => handleDispSetup('tlPulseWidth', v)} step={5} icon={<Timer className="w-4 h-4 text-red-500" />} placeholder="e.g. 50" />
+              <InputCard label="" symbol="τ₀" unit="fs" value={dispSetup.tlPulseWidth} onChange={(v) => handleDispSetupChange('tlPulseWidth', v)} step={5} icon={<Timer className="w-4 h-4 text-red-500" />} placeholder="e.g. 50" />
             </div>
           </div>
           <div className="mb-6 space-y-4">
@@ -1246,15 +1311,15 @@ const App = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Center Wavelength</span>
-                <InputCard label="" symbol="λ₀" unit="nm" value={acSetup.centerLam} onChange={(v) => handleAcSetup('centerLam', v)} step={10} icon={<Waves className="w-4 h-4 text-red-500" />} />
+                <InputCard label="" symbol="λ₀" unit="nm" value={acSetup.centerLam} onChange={(v) => handleAcSetupChange('centerLam', v)} step={10} icon={<Waves className="w-4 h-4 text-red-500" />} />
               </div>
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Spectral FWHM</span>
-                <InputCard label="" symbol="Δλ" unit="nm" value={acSetup.spectralWidth} onChange={(v) => handleAcSetup('spectralWidth', v)} step={5} icon={<ArrowRightLeft className="w-4 h-4 text-red-500" />} />
+                <InputCard label="" symbol="Δλ" unit="nm" value={acSetup.spectralWidth} onChange={(v) => handleAcSetupChange('spectralWidth', v)} step={5} icon={<ArrowRightLeft className="w-4 h-4 text-red-500" />} />
               </div>
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">TL Pulse Width</span>
-                <InputCard label="" symbol="τ₀" unit="fs" value={acSetup.tlPulseWidth} onChange={(v) => handleAcSetup('tlPulseWidth', v)} step={5} icon={<Timer className="w-4 h-4 text-red-500" />} />
+                <InputCard label="" symbol="τ₀" unit="fs" value={acSetup.tlPulseWidth} onChange={(v) => handleAcSetupChange('tlPulseWidth', v)} step={5} icon={<Timer className="w-4 h-4 text-red-500" />} />
               </div>
             </div>
           ) : (
