@@ -114,6 +114,7 @@ const App = () => {
   const traceCanvasRef = useRef(null);
   const spectrumCanvasRef = useRef(null);
   const animationRef = useRef(null);
+  const timeoutRef = useRef(null); // Ref for the 5-second pause delay
 
   // Jacobian State & Refs
   const [jacobSetup, setJacobSetup] = useState({ direction: 'nm2cm' });
@@ -636,28 +637,13 @@ const App = () => {
     const maxRetr = retrieved_I?.reduce((a, b) => Math.max(a, b), 0) || 1;
     const getY = (val) => h - (val * h * 0.8) - (0.1 * h);
 
-    // Original Spectrum (Dashed Gray)
-    ctx.beginPath();
-    ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2;
-    let first = true;
-    for (let i = 0; i < origLambda.length; i++) {
-      if (origLambda[i] >= xMin && origLambda[i] <= xMax) {
-        const xP = (origLambda[i] - xMin) / (xMax - xMin) * w;
-        const yP = getY(origI[i] / maxOrig);
-        if (first) { ctx.moveTo(xP, yP); first = false; } else ctx.lineTo(xP, yP);
-      }
-    }
-    ctx.stroke();
-
-    // Retrieved Spectrum (Solid Green) -> Only show if 1 sweep is done
+    // 1. Retrieved Spectrum (Solid Green) -> Draw FIRST so it sits behind the original trace
     if (simData.current.hasCompletedOneSweep && retrievedLambda && retrievedLambda.length > 0) {
       ctx.beginPath();
       ctx.setLineDash([]);
       ctx.strokeStyle = '#16a34a';
       ctx.lineWidth = 2;
-      first = true;
+      let first = true;
       for (let i = 0; i < retrievedLambda.length; i++) {
         if (retrievedLambda[i] >= xMin && retrievedLambda[i] <= xMax) {
           const xP = (retrievedLambda[i] - xMin) / (xMax - xMin) * w;
@@ -668,7 +654,22 @@ const App = () => {
       ctx.stroke();
     }
 
-    // Explicit Canvas Legend
+    // 2. Original Spectrum (Dashed Gray) -> Draw SECOND so it overlays cleanly
+    ctx.beginPath();
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 3; // Make original line significantly thicker to be visible
+    let firstOrig = true;
+    for (let i = 0; i < origLambda.length; i++) {
+      if (origLambda[i] >= xMin && origLambda[i] <= xMax) {
+        const xP = (origLambda[i] - xMin) / (xMax - xMin) * w;
+        const yP = getY(origI[i] / maxOrig);
+        if (firstOrig) { ctx.moveTo(xP, yP); firstOrig = false; } else ctx.lineTo(xP, yP);
+      }
+    }
+    ctx.stroke();
+
+    // Explicit Canvas Legend (Only one legend now)
     const legW = 100, legH = 46;
     const legX = w - legW - 10, legY = 10;
 
@@ -681,6 +682,7 @@ const App = () => {
 
     // Reconstructed Legend Item
     ctx.beginPath();
+    ctx.setLineDash([]);
     ctx.strokeStyle = '#16a34a';
     ctx.lineWidth = 2;
     ctx.moveTo(legX + 8, legY + 14); ctx.lineTo(legX + 24, legY + 14);
@@ -693,8 +695,9 @@ const App = () => {
 
     // Original Legend Item
     ctx.beginPath();
-    ctx.setLineDash([4, 2]);
+    ctx.setLineDash([5, 5]);
     ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 3; // Match the new thicker line
     ctx.moveTo(legX + 8, legY + 32); ctx.lineTo(legX + 24, legY + 32);
     ctx.stroke();
     ctx.fillText('Original', legX + 30, legY + 32);
@@ -717,6 +720,7 @@ const App = () => {
   const resetAcSimulation = () => {
     setIsAcSimulating(false);
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
     simData.current = {
       t: [], E1_Re: [], E1_Im: [],
       Mag: [], Phase: [],
@@ -765,6 +769,7 @@ const App = () => {
   const runAcSimulation = () => {
     if (isAcSimulating) {
       cancelAnimationFrame(animationRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setIsAcSimulating(false);
       return;
     }
@@ -979,13 +984,20 @@ const App = () => {
         frame += animStep;
         animationRef.current = requestAnimationFrame(animate);
       } else {
+        // Sweep has completed
         if (!simData.current.hasCompletedOneSweep) {
           simData.current.hasCompletedOneSweep = true;
           drawSpectrumOverlay();
+
+          // Pause the animation for 5 seconds before restarting
+          timeoutRef.current = setTimeout(() => {
+            frame = 0;
+            simData.current.currentFrame = 0;
+            simData.current.hasCompletedOneSweep = false; // Hide reconstructed line for the new sweep
+            drawSpectrumOverlay(); // Update canvas to remove the green line
+            animationRef.current = requestAnimationFrame(animate);
+          }, 5000);
         }
-        frame = 0;
-        simData.current.currentFrame = 0;
-        animationRef.current = requestAnimationFrame(animate);
       }
     };
     animate();
@@ -994,6 +1006,7 @@ const App = () => {
   useEffect(() => {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     }
   }, [mode]);
 
@@ -1283,10 +1296,6 @@ const App = () => {
                   </div>
                 </div>
               </div>
-
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800">
-                <strong>Energy Conserved:</strong> The transformed intensity profile correctly integrates to the same area as the original profile by multiplying by the proper Jacobian factor |dx/dy|.
-              </div>
             </div>
           )}
         </div>
@@ -1388,18 +1397,6 @@ const App = () => {
               <div className="bg-white p-1 rounded-lg border border-red-100 shadow-inner flex flex-col relative group">
                 <canvas ref={spectrumCanvasRef} width={400} height={200} className="w-full h-32 md:h-40 rounded bg-slate-50"></canvas>
 
-                {/* HTML Legend */}
-                <div className="absolute top-2 left-2 bg-white/90 border border-slate-200 p-1.5 rounded shadow-sm flex flex-col gap-1 text-[9px] pointer-events-none z-10">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-[2px] bg-green-600"></div>
-                    <span className="text-slate-700 font-bold">Retrieved</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-0 border-t-[1.5px] border-dashed border-slate-500"></div>
-                    <span className="text-slate-700 font-bold">Original</span>
-                  </div>
-                </div>
-
                 <div className="absolute bottom-6 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <button onClick={() => handleZoom('spectrum', 'in')} className="bg-white/90 hover:bg-white p-1.5 rounded shadow text-gray-700 border border-gray-200"><Plus size={14} /></button>
                   <button onClick={() => handleZoom('spectrum', 'out')} className="bg-white/90 hover:bg-white p-1.5 rounded shadow text-gray-700 border border-gray-200"><Minus size={14} /></button>
@@ -1444,12 +1441,6 @@ const App = () => {
         <h2 className="text-lg font-bold text-gray-800 mb-3">Online Spectroscopy Unit Converter & Laser Simulator</h2>
         <p className="mb-4">
           This comprehensive tool is designed for <strong>Ultrafast Physicists</strong> and <strong>Laser Spectroscopists</strong> at the <strong>MuSIG Lab (IISc)</strong> and worldwide.
-        </p>
-        <h3 className="font-semibold text-gray-800 mb-2">How to convert nm to cm⁻¹ (Wavelength to Wavenumber)</h3>
-        <p className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
-          To convert wavelength in nanometers (nm) to wavenumber in inverse centimeters (cm⁻¹), use the formula: <br />
-          <strong className="text-red-600 font-mono text-base">ṽ (cm⁻¹) = 10,000,000 / λ (nm)</strong><br />
-          Because 1 cm is equal to 10,000,000 nm, dividing 10⁷ by the wavelength in nm yields the number of waves per centimeter.
         </p>
 
         {/* DONATION BUTTON */}
