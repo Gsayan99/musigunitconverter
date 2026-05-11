@@ -1422,16 +1422,71 @@ const App = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700 text-sm">
-            <div className="space-y-3">
-              <p><strong className="text-red-600">TL Pulse (Gaussian):</strong> <br /> Δτ · Δν ≈ 0.441</p>
-              <p><strong className="text-red-600">Pulse Broadening:</strong> <br /> τ_out = τ₀ · √[1 + (4ln2 · GDD / τ₀²)²]</p>
-              <p><strong className="text-red-600">Field Autocorrelation S(τ):</strong> <br /> S(τ) = ∫ |E(t) + E(t-τ)|² dt</p>
-            </div>
-            <div className="space-y-3">
-              <p><strong className="text-red-600">Peak Fluence (F):</strong> <br /> F = 8 · E / (π · D²)</p>
-              <p><strong className="text-red-600">Jacobian (nm to cm⁻¹):</strong> <br /> I(ṽ) = I(λ) · (λ² / 10⁷)</p>
-              <p><strong className="text-red-600">Jacobian (cm⁻¹ to nm):</strong> <br /> I(λ) = I(ṽ) · (ṽ² / 10⁷)</p>
-            </div>
+            {mode === 'single' && (
+              <>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Speed of Light (c):</strong> <br /> ≈ 299.79246 nm/fs</p>
+                  <p><strong className="text-red-600">Wavelength (λ) ↔ Frequency (ν):</strong> <br /> λ = c / ν</p>
+                </div>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Angular Freq (ω) ↔ Frequency (ν):</strong> <br /> ω = 2π · ν</p>
+                  <p><strong className="text-red-600">Wavenumber (ṽ) ↔ Frequency (ν):</strong> <br /> ν (fs⁻¹) = ṽ (cm⁻¹) × 2.9979 × 10⁻⁵</p>
+                </div>
+              </>
+            )}
+            {mode === 'bandwidth' && (
+              <>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Difference:</strong> <br /> Δ = |Value₁ - Value₂|</p>
+                </div>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">TL Pulse Width (Gaussian):</strong> <br /> Δτ · Δν ≈ 0.441</p>
+                </div>
+              </>
+            )}
+            {mode === 'dispersion' && (
+              <>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Taylor Expansion (Phase):</strong> <br /> Φ(ω) ≈ Φ₀ + Φ₁Δω + ½Φ₂Δω² + ⅙Φ₃Δω³</p>
+                  <p><strong className="text-red-600">GDD (Φ₂):</strong> <br /> Group Delay Dispersion [fs²]</p>
+                </div>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Pulse Broadening:</strong> <br /> τ_out = τ₀ · √[1 + (4ln2 · GDD / τ₀²)²]</p>
+                  <p><strong className="text-red-600">TL Pulse (Gaussian):</strong> <br /> Δτ · Δν ≈ 0.441</p>
+                </div>
+              </>
+            )}
+            {mode === 'fluence' && (
+              <>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Pulse Energy (Ep):</strong> <br /> Ep = P_avg / R_rep</p>
+                </div>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Peak Fluence (F_peak):</strong> <br /> F = 8 · Ep / (π · D²)</p>
+                  <p className="text-xs text-gray-500 italic mt-1">Where D is the 1/e² beam diameter.</p>
+                </div>
+              </>
+            )}
+            {mode === 'jacobian' && (
+              <>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Jacobian (nm to cm⁻¹):</strong> <br /> I(ṽ) = I(λ) · (λ² / 10⁷)</p>
+                </div>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Jacobian (cm⁻¹ to nm):</strong> <br /> I(λ) = I(ṽ) · (ṽ² / 10⁷)</p>
+                </div>
+              </>
+            )}
+            {mode === 'autocorr' && (
+              <>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Field Autocorrelation S(τ):</strong> <br /> S(τ) = ∫ |E(t) + E(t-τ)|² dt</p>
+                </div>
+                <div className="space-y-3">
+                  <p><strong className="text-red-600">Wiener-Khinchin Theorem:</strong> <br /> S(τ) ↔ |E(ω)|² (Fourier Transform Pair)</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
